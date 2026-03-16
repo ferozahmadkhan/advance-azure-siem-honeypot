@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Azure Honeypot — Feroz Khan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #0f1423;
+    --surface2: #151c30;
+    --border: rgba(0,212,255,0.15);
+    --accent: #00d4ff;
+    --accent2: #ff4d6d;
+    --accent3: #7c3aed;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  /* ── GRID BACKGROUND ── */
+  body::before {
+    content:'';
+    position:fixed;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* ── SCANLINE OVERLAY ── */
+  body::after {
+    content:'';
+    position:fixed;
+    inset:0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position:fixed;
+    top:0; left:0; right:0;
+    z-index:100;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 1rem 2rem;
+    background: rgba(10,14,26,0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+
+  .nav-links {
+    display:flex;
+    gap:2rem;
+    list-style:none;
+  }
+
+  .nav-links a {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-decoration:none;
+    letter-spacing:0.08em;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--accent); }
+
+  /* ── SECTIONS ── */
+  section {
+    position:relative;
+    z-index:1;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding: 6rem 2rem 4rem;
+  }
+
+  .hero-badge {
+    display:inline-flex;
+    align-items:center;
+    gap:0.5rem;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing:0.15em;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 0.35rem 1rem;
+    border-radius: 2px;
+    margin-bottom: 2rem;
+    animation: fadeIn 0.6s ease both;
+  }
+
+  .badge-dot {
+    width:6px; height:6px;
+    background: var(--accent);
+    border-radius:50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100%{ opacity:1; transform:scale(1); }
+    50%{ opacity:0.4; transform:scale(1.4); }
+  }
+
+  .hero h1 {
+    font-size: clamp(2.5rem, 7vw, 5.5rem);
+    font-weight: 800;
+    line-height: 1.05;
+    margin-bottom: 1.5rem;
+    animation: slideUp 0.8s ease both 0.1s;
+  }
+
+  .hero h1 span {
+    display:block;
+    background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
+  }
+
+  .hero-sub {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--muted);
+    max-width: 560px;
+    line-height: 1.8;
+    margin-bottom: 3rem;
+    animation: slideUp 0.8s ease both 0.2s;
+  }
+
+  .hero-stats {
+    display:flex;
+    gap:2rem;
+    flex-wrap:wrap;
+    justify-content:center;
+    margin-bottom: 3rem;
+    animation: slideUp 0.8s ease both 0.3s;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1.2rem 1.8rem;
+    border-radius: 4px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+
+  .stat-card::before {
+    content:'';
+    position:absolute;
+    top:0; left:0; right:0;
+    height:2px;
+    background: var(--accent);
+  }
+
+  .stat-num {
+    font-family: var(--mono);
+    font-size: 2rem;
+    font-weight:700;
+    color: var(--accent);
+    display:block;
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing:0.1em;
+    color: var(--muted);
+    text-transform:uppercase;
+  }
+
+  .hero-btns {
+    display:flex;
+    gap:1rem;
+    flex-wrap:wrap;
+    justify-content:center;
+    animation: slideUp 0.8s ease both 0.4s;
+  }
+
+  .btn {
+    display:inline-flex;
+    align-items:center;
+    gap:0.5rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing:0.08em;
+    padding: 0.75rem 1.8rem;
+    border-radius: 2px;
+    text-decoration:none;
+    cursor:pointer;
+    transition: all 0.2s;
+    border: none;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    font-weight:700;
+  }
+  .btn-primary:hover { background: #00f0ff; transform:translateY(-1px); }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .btn-secondary:hover { background: rgba(0,212,255,0.08); transform:translateY(-1px); }
+
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── SECTION HEADERS ── */
+  .section-header {
+    text-align:center;
+    margin-bottom: 3.5rem;
+  }
+
+  .section-tag {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing:0.2em;
+    color: var(--accent);
+    text-transform:uppercase;
+    display:block;
+    margin-bottom:0.75rem;
+  }
+
+  .section-title {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight:800;
+    line-height:1.1;
+  }
+
+  .section-desc {
+    font-family: var(--mono);
+    font-size:0.85rem;
+    color: var(--muted);
+    margin-top:0.75rem;
+    max-width:500px;
+    margin-left:auto;
+    margin-right:auto;
+    line-height:1.8;
+  }
+
+  /* ── ARCHITECTURE ── */
+  .arch-section {
+    padding: 6rem 2rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .arch-flow {
+    max-width: 900px;
+    margin: 0 auto;
+    display:grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+    align-items:center;
+    gap:0.5rem;
+  }
+
+  .flow-node {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.2rem 1rem;
+    text-align:center;
+    position:relative;
+  }
+
+  .flow-node.attacker { border-color: var(--accent2); }
+  .flow-node.attacker .node-icon { color: var(--accent2); }
+
+  .flow-node.honeypot { border-color: #f59e0b; }
+  .flow-node.honeypot .node-icon { color: #f59e0b; }
+
+  .flow-node.azure { border-color: var(--accent); }
+  .flow-node.azure .node-icon { color: var(--accent); }
+
+  .flow-node.sentinel { border-color: var(--accent3); }
+  .flow-node.sentinel .node-icon { color: var(--accent3); }
+
+  .node-icon {
+    font-size: 1.6rem;
+    display:block;
+    margin-bottom:0.5rem;
+  }
+
+  .node-title {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight:700;
+    letter-spacing:0.05em;
+    display:block;
+    margin-bottom:0.25rem;
+  }
+
+  .node-sub {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+  }
+
+  .flow-arrow {
+    font-size: 1.2rem;
+    color: var(--muted);
+    text-align:center;
+  }
+
+  /* ── WHAT IS COWRIE ── */
+  .cowrie-section {
+    padding: 6rem 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .cowrie-grid {
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 3rem;
+  }
+
+  .cowrie-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2rem;
+    position:relative;
+    overflow:hidden;
+    transition: border-color 0.2s;
+  }
+  .cowrie-card:hover { border-color: rgba(0,212,255,0.4); }
+
+  .cowrie-card::after {
+    content:'';
+    position:absolute;
+    inset:0;
+    background: linear-gradient(135deg, rgba(0,212,255,0.03) 0%, transparent 60%);
+    pointer-events:none;
+  }
+
+  .card-number {
+    font-family: var(--mono);
+    font-size: 3rem;
+    font-weight:700;
+    color: rgba(0,212,255,0.1);
+    position:absolute;
+    top:1rem; right:1.5rem;
+    line-height:1;
+  }
+
+  .card-icon {
+    font-size:1.5rem;
+    margin-bottom:1rem;
+  }
+
+  .card-title {
+    font-size:1.1rem;
+    font-weight:700;
+    margin-bottom:0.5rem;
+    color: var(--accent);
+  }
+
+  .card-body {
+    font-family: var(--mono);
+    font-size:0.78rem;
+    color: var(--muted);
+    line-height:1.8;
+  }
+
+  /* ── STEPS ── */
+  .steps-section {
+    padding: 6rem 2rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .steps-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .step {
+    display:grid;
+    grid-template-columns: 60px 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+    position:relative;
+  }
+
+  .step:last-child { border-bottom:none; margin-bottom:0; }
+
+  .step-num {
+    width:48px; height:48px;
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family: var(--mono);
+    font-size:1rem;
+    font-weight:700;
+    color: var(--accent);
+    flex-shrink:0;
+  }
+
+  .step-title {
+    font-size:1.1rem;
+    font-weight:700;
+    margin-bottom:0.5rem;
+  }
+
+  .step-desc {
+    font-family: var(--mono);
+    font-size:0.78rem;
+    color: var(--muted);
+    line-height:1.8;
+    margin-bottom:0.75rem;
+  }
+
+  .code-block {
+    background: #000;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 2px;
+    padding: 0.75rem 1rem;
+    font-family: var(--mono);
+    font-size:0.72rem;
+    color: #7dd3fc;
+    overflow-x:auto;
+    white-space:pre;
+  }
+
+  /* ── SCREENSHOTS ── */
+  .screenshots-section {
+    padding: 6rem 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .screenshots-grid {
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap:1.5rem;
+    margin-top:3rem;
+  }
+
+  .screenshot-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow:hidden;
+    transition: all 0.2s;
+  }
+  .screenshot-card:hover {
+    border-color: rgba(0,212,255,0.4);
+    transform: translateY(-3px);
+  }
+
+  .ss-header {
+    background: #000;
+    padding: 0.5rem 1rem;
+    display:flex;
+    align-items:center;
+    gap:0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ss-dot {
+    width:8px; height:8px; border-radius:50%;
+  }
+
+  .ss-title {
+    font-family: var(--mono);
+    font-size:0.65rem;
+    color: var(--muted);
+    margin-left:0.5rem;
+  }
+
+  .ss-img {
+    width:100%;
+    height:200px;
+    object-fit:cover;
+    object-position:top;
+    display:block;
+    filter: brightness(0.9);
+    transition: filter 0.2s;
+  }
+  .screenshot-card:hover .ss-img { filter: brightness(1); }
+
+  .ss-caption {
+    padding: 0.75rem 1rem;
+    font-family: var(--mono);
+    font-size:0.68rem;
+    color: var(--muted);
+    line-height:1.6;
+  }
+
+  /* ── RESULTS ── */
+  .results-section {
+    padding: 6rem 2rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .results-grid {
+    max-width: 900px;
+    margin: 3rem auto 0;
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap:1.5rem;
+  }
+
+  .result-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2rem 1.5rem;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+    transition: all 0.2s;
+  }
+  .result-card:hover { border-color: var(--accent); }
+
+  .result-card::before {
+    content:'';
+    position:absolute;
+    bottom:0; left:0; right:0;
+    height:2px;
+  }
+
+  .result-card.r1::before { background: var(--accent2); }
+  .result-card.r2::before { background: #f59e0b; }
+  .result-card.r3::before { background: var(--accent); }
+  .result-card.r4::before { background: var(--accent3); }
+
+  .result-num {
+    font-family: var(--mono);
+    font-size:2.5rem;
+    font-weight:700;
+    display:block;
+    line-height:1;
+    margin-bottom:0.5rem;
+  }
+  .r1 .result-num { color: var(--accent2); }
+  .r2 .result-num { color: #f59e0b; }
+  .r3 .result-num { color: var(--accent); }
+  .r4 .result-num { color: var(--accent3); }
+
+  .result-label {
+    font-family: var(--mono);
+    font-size:0.65rem;
+    letter-spacing:0.1em;
+    color: var(--muted);
+    text-transform:uppercase;
+  }
+
+  /* ── MITRE TABLE ── */
+  .mitre-section {
+    padding: 6rem 2rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  table {
+    width:100%;
+    border-collapse:collapse;
+    margin-top:3rem;
+    font-family: var(--mono);
+    font-size:0.78rem;
+  }
+
+  th {
+    background: var(--surface);
+    color: var(--accent);
+    padding: 0.75rem 1.2rem;
+    text-align:left;
+    border: 1px solid var(--border);
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    font-size:0.65rem;
+  }
+
+  td {
+    padding: 0.75rem 1.2rem;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    vertical-align:middle;
+  }
+
+  tr:hover td { background: var(--surface); color: var(--text); }
+
+  .sev-badge {
+    display:inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius:2px;
+    font-size:0.65rem;
+    letter-spacing:0.08em;
+    font-weight:700;
+  }
+  .sev-critical { background: rgba(255,77,109,0.15); color: var(--accent2); border:1px solid var(--accent2); }
+  .sev-high { background: rgba(245,158,11,0.15); color: #f59e0b; border:1px solid #f59e0b; }
+  .sev-medium { background: rgba(124,58,237,0.15); color: #a78bfa; border:1px solid #7c3aed; }
+
+  /* ── ABOUT ── */
+  .about-section {
+    padding: 6rem 2rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .about-inner {
+    max-width: 700px;
+    margin: 0 auto;
+    text-align:center;
+  }
+
+  .about-avatar {
+    width:80px; height:80px;
+    border-radius:50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:2rem;
+    margin: 0 auto 1.5rem;
+    border: 2px solid var(--border);
+  }
+
+  .about-name {
+    font-size:1.8rem;
+    font-weight:800;
+    margin-bottom:0.5rem;
+  }
+
+  .about-role {
+    font-family: var(--mono);
+    font-size:0.8rem;
+    color: var(--accent);
+    letter-spacing:0.1em;
+    margin-bottom:1.5rem;
+  }
+
+  .about-bio {
+    font-family: var(--mono);
+    font-size:0.82rem;
+    color: var(--muted);
+    line-height:1.9;
+    margin-bottom:2rem;
+  }
+
+  .skills-row {
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.5rem;
+    justify-content:center;
+  }
+
+  .skill-tag {
+    font-family: var(--mono);
+    font-size:0.65rem;
+    letter-spacing:0.08em;
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius:2px;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .skill-tag:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 3rem 2rem;
+    text-align:center;
+    border-top: 1px solid var(--border);
+    position:relative;
+    z-index:1;
+  }
+
+  .footer-logo {
+    font-family: var(--mono);
+    font-size:0.7rem;
+    color: var(--muted);
+    letter-spacing:0.1em;
+  }
+
+  .footer-logo span { color: var(--accent); }
+
+  /* ── TERMINAL ANIMATION ── */
+  .terminal {
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow:hidden;
+    max-width: 640px;
+    margin: 3rem auto 0;
+    text-align:left;
+  }
+
+  .terminal-bar {
+    background: #111;
+    padding: 0.5rem 1rem;
+    display:flex;
+    align-items:center;
+    gap:0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .terminal-body {
+    padding: 1.2rem 1.5rem;
+    font-family: var(--mono);
+    font-size:0.75rem;
+    line-height:2;
+    min-height:160px;
+  }
+
+  .t-cmd { color: #7dd3fc; }
+  .t-out { color: #4ade80; }
+  .t-warn { color: #f59e0b; }
+  .t-err { color: var(--accent2); }
+  .t-muted { color: var(--muted); }
+
+  .cursor {
+    display:inline-block;
+    width:8px; height:1em;
+    background: var(--accent);
+    animation: blink 1s step-end infinite;
+    vertical-align:middle;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .arch-flow { grid-template-columns: 1fr; }
+    .flow-arrow { transform: rotate(90deg); }
+    .cowrie-grid { grid-template-columns: 1fr; }
+    .nav-links { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <div class="nav-logo">FK_SECURITY :: HONEYPOT_V2</div>
+  <ul class="nav-links">
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#cowrie">Cowrie</a></li>
+    <li><a href="#setup">Setup</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="#about">About</a></li>
+  </ul>
+</nav>
+
+<!-- ── HERO ── -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="badge-dot"></span>
+    LIVE THREAT DETECTION ACTIVE
+  </div>
+
+  <h1>
+    Advanced Azure<br>
+    <span>Honeypot System</span>
+  </h1>
+
+  <p class="hero-sub">
+    A complete SSH/Telnet honeypot built on Microsoft Azure Free Trial.<br>
+    Real attackers. Real incidents. Real threat intelligence. Zero dollars.
+  </p>
+
+  <div class="hero-stats">
+    <div class="stat-card">
+      <span class="stat-num">597</span>
+      <span class="stat-label">Incidents Detected</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">2.1k</span>
+      <span class="stat-label">Attack Attempts</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">$0</span>
+      <span class="stat-label">Total Cost</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">4</span>
+      <span class="stat-label">MITRE Rules</span>
+    </div>
+  </div>
+
+  <div class="hero-btns">
+    <a href="https://github.com/ferozkhan" class="btn btn-primary">View on GitHub</a>
+    <a href="#setup" class="btn btn-secondary">Read the Guide</a>
+  </div>
+
+  <div class="terminal">
+    <div class="terminal-bar">
+      <span class="ss-dot" style="background:#ff5f57"></span>
+      <span class="ss-dot" style="background:#febc2e"></span>
+      <span class="ss-dot" style="background:#28c840"></span>
+      <span class="ss-title">cowrie@huzipc:~/cowrie</span>
+    </div>
+    <div class="terminal-body">
+      <div><span class="t-muted">$ </span><span class="t-cmd">tail -f var/log/cowrie/cowrie.log</span></div>
+      <div><span class="t-out">[2026-03-16] New connection: 120.48.199.28:41820 → port 2222</span></div>
+      <div><span class="t-warn">[2026-03-16] login attempt [root/123456] succeeded</span></div>
+      <div><span class="t-out">[2026-03-16] CMD: uname -s -v -n -m 2>/dev/null</span></div>
+      <div><span class="t-out">[2026-03-16] CMD: cat /etc/passwd</span></div>
+      <div><span class="t-err">[2026-03-16] File download attempt: http://malware.sh/bot.sh</span></div>
+      <div><span class="t-muted">$ </span><span class="cursor"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── ARCHITECTURE ── -->
+<section id="architecture" class="arch-section">
+  <div class="section-header">
+    <span class="section-tag">// system design</span>
+    <h2 class="section-title">How It Works</h2>
+    <p class="section-desc">Four layers working together — from attacker connection to incident alert</p>
+  </div>
+
+  <div class="arch-flow">
+    <div class="flow-node attacker">
+      <span class="node-icon">💻</span>
+      <span class="node-title">Attacker</span>
+      <span class="node-sub">Internet scanners<br>and bots</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node azure">
+      <span class="node-icon">🔒</span>
+      <span class="node-title">Azure NSG</span>
+      <span class="node-sub">Allows port<br>22 &amp; 23</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node honeypot">
+      <span class="node-icon">🍯</span>
+      <span class="node-title">Cowrie</span>
+      <span class="node-sub">Fake SSH shell<br>port 2222/2223</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node sentinel">
+      <span class="node-icon">🛡️</span>
+      <span class="node-title">Sentinel</span>
+      <span class="node-sub">KQL rules<br>Auto incidents</span>
+    </div>
+  </div>
+
+  <div style="max-width:700px; margin:3rem auto 0; display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+    <div class="step-desc" style="background:var(--bg); border:1px solid var(--border); padding:1rem; border-radius:4px;">
+      <strong style="color:var(--accent); font-family:var(--mono); font-size:0.7rem;">PORT STRATEGY</strong><br><br>
+      <span style="font-family:var(--mono); font-size:0.72rem; color:var(--muted);">
+        Port 22/23 → iptables → Port 2222/2223 (Cowrie)<br>
+        Port 4444 → Real SSH (admin only)<br>
+        Port 22 is never exposed to real system
+      </span>
+    </div>
+    <div class="step-desc" style="background:var(--bg); border:1px solid var(--border); padding:1rem; border-radius:4px;">
+      <strong style="color:var(--accent); font-family:var(--mono); font-size:0.7rem;">LOG PIPELINE</strong><br><br>
+      <span style="font-family:var(--mono); font-size:0.72rem; color:var(--muted);">
+        Cowrie → cowrie.json → Azure Monitor Agent<br>
+        → Log Analytics (CowrieLogs_CL table)<br>
+        → Sentinel KQL rules → Incidents
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- ── WHAT IS COWRIE ── -->
+<section id="cowrie" class="cowrie-section">
+  <div class="section-header">
+    <span class="section-tag">// honeypot software</span>
+    <h2 class="section-title">Why Cowrie?</h2>
+    <p class="section-desc">The industry standard SSH/Telnet honeypot — trusted by security researchers worldwide</p>
+  </div>
+
+  <div class="cowrie-grid">
+    <div class="cowrie-card">
+      <span class="card-number">01</span>
+      <div class="card-icon">🎭</div>
+      <div class="card-title">Realistic Simulation</div>
+      <p class="card-body">Cowrie emulates a complete Linux environment. Attackers cannot tell it is fake — they see realistic file systems, commands, and responses.</p>
+    </div>
+    <div class="cowrie-card">
+      <span class="card-number">02</span>
+      <div class="card-icon">🪤</div>
+      <div class="card-title">Intentionally Accepts Logins</div>
+      <p class="card-body">Unlike real SSH, Cowrie lets everyone in on purpose. Attackers think they have access while every command they run is recorded in detail.</p>
+    </div>
+    <div class="cowrie-card">
+      <span class="card-number">03</span>
+      <div class="card-icon">🔒</div>
+      <div class="card-title">Safe by Design</div>
+      <p class="card-body">Runs as an unprivileged user. Attackers cannot escape the fake shell to reach the real system. Complete isolation guaranteed.</p>
+    </div>
+    <div class="cowrie-card">
+      <span class="card-number">04</span>
+      <div class="card-icon">📊</div>
+      <div class="card-title">Structured JSON Logging</div>
+      <p class="card-body">Every keystroke, command, and download attempt is logged in JSON format — perfect for shipping to Azure Log Analytics and querying with KQL.</p>
+    </div>
+  </div>
+
+  <div style="background:var(--surface); border:1px solid var(--border); border-left:3px solid #f59e0b; border-radius:4px; padding:1.5rem 2rem; max-width:700px; margin:2rem auto 0; font-family:var(--mono); font-size:0.78rem; color:var(--muted); line-height:1.9;">
+    <strong style="color:#f59e0b;">💡 The Movie Set Analogy</strong><br><br>
+    A burglar breaks into what they think is a real house — but it's a Hollywood set with fake furniture. 
+    Cameras record everything while the burglar finds nothing of value. 
+    This is exactly what Cowrie does — every attacker thinks they won, while we watch and record.
+  </div>
+</section>
+
+<!-- ── SETUP GUIDE ── -->
+<section id="setup" class="steps-section">
+  <div class="section-header">
+    <span class="section-tag">// deployment guide</span>
+    <h2 class="section-title">Setup in 10 Steps</h2>
+    <p class="section-desc">Complete guide — from zero to live honeypot on Azure Free Trial</p>
+  </div>
+
+  <div class="steps-container">
+
+    <div class="step">
+      <div class="step-num">01</div>
+      <div>
+        <div class="step-title">Create Resource Group</div>
+        <p class="step-desc">Create a container for all resources. This makes cleanup easy — delete the group and everything goes.</p>
+        <div class="code-block">Azure Portal → Resource Groups → + Create
+Name: honeypot-rg | Region: East US</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">02</div>
+      <div>
+        <div class="step-title">Deploy Free Ubuntu VM</div>
+        <p class="step-desc">Deploy a B1s or B2ats_v2 VM (free eligible). Download the .pem key when prompted — save it safely.</p>
+        <div class="code-block">Image: Ubuntu Server 22.04 LTS
+Size: Standard_B2ats_v2 (free eligible)
+Auth: SSH public key</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">03</div>
+      <div>
+        <div class="step-title">Configure NSG Rules</div>
+        <p class="step-desc">Open ports for attackers and a secret admin port. Never use port 22 for real admin access once Cowrie is running.</p>
+        <div class="code-block">Port 22  → Allow (honeypot trap)
+Port 23  → Allow (telnet trap)
+Port 4444 → Allow (your admin door)</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">04</div>
+      <div>
+        <div class="step-title">Install Cowrie</div>
+        <p class="step-desc">Create a dedicated unprivileged user, download Cowrie, set up Python virtual environment.</p>
+        <div class="code-block">sudo adduser --disabled-password cowrie
+sudo git clone https://github.com/cowrie/cowrie.git /home/cowrie/cowrie
+sudo chown -R cowrie:cowrie /home/cowrie/cowrie
+sudo su - cowrie && cd cowrie
+python3 -m venv cowrie-env && source cowrie-env/bin/activate
+pip install -r requirements.txt</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">05</div>
+      <div>
+        <div class="step-title">Configure Cowrie Ports</div>
+        <p class="step-desc">Set Cowrie to listen on 2222 and 2223 (not 22/23 — Linux blocks privileged ports for non-root users).</p>
+        <div class="code-block">cp etc/cowrie.cfg.dist etc/cowrie.cfg
+# [ssh] section:  listen_endpoints = tcp:2222:interface=0.0.0.0
+# [telnet] section: enabled = true
+#                   listen_endpoints = tcp:2223:interface=0.0.0.0</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">06</div>
+      <div>
+        <div class="step-title">Set Up iptables Redirect</div>
+        <p class="step-desc">Redirect public port 22 to Cowrie's internal port 2222. Save rules permanently so they survive reboots.</p>
+        <div class="code-block">sudo iptables -t nat -A PREROUTING -p tcp --dport 22 -j REDIRECT --to-port 2222
+sudo iptables -t nat -A PREROUTING -p tcp --dport 23 -j REDIRECT --to-port 2223
+sudo apt-get install -y iptables-persistent && sudo netfilter-persistent save</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">07</div>
+      <div>
+        <div class="step-title">Start Cowrie</div>
+        <p class="step-desc">Launch the honeypot. Watch live logs to confirm attackers are being captured.</p>
+        <div class="code-block">twistd --pidfile var/run/cowrie.pid -l var/log/cowrie/cowrie.log cowrie
+tail -f var/log/cowrie/cowrie.log</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">08</div>
+      <div>
+        <div class="step-title">Create Log Analytics + Sentinel</div>
+        <p class="step-desc">Set up the Azure SIEM stack. Sentinel gives you 31 days free — more than enough to build this.</p>
+        <div class="code-block">Azure Portal → Log Analytics Workspaces → Create
+Name: law-honeypot | Region: match your VM
+
+Azure Portal → Microsoft Sentinel → Add → Select workspace</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">09</div>
+      <div>
+        <div class="step-title">Configure Log Pipeline</div>
+        <p class="step-desc">Create a Data Collection Rule to ship Cowrie's JSON logs to Log Analytics automatically.</p>
+        <div class="code-block">Sentinel → Content Hub → Custom Logs via AMA → Install
+Data Connectors → Custom Logs via AMA → Create DCR
+
+File pattern: /home/cowrie/cowrie/var/log/cowrie/cowrie.json*
+Table name: CowrieLogs_CL
+Record delimiter: End of Line</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">10</div>
+      <div>
+        <div class="step-title">Create KQL Detection Rules</div>
+        <p class="step-desc">Write analytics rules that automatically detect and alert on attack patterns.</p>
+        <div class="code-block">// Brute Force Detection
+CowrieLogs_CL
+| where RawData contains "cowrie.login.failed"
+| extend src_ip = extract('"src_ip":"([^"]+)"', 1, RawData)
+| summarize FailedAttempts = count() by src_ip, bin(TimeGenerated, 5m)
+| where FailedAttempts > 2</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── SCREENSHOTS ── -->
+<section class="screenshots-section">
+  <div class="section-header">
+    <span class="section-tag">// lab evidence</span>
+    <h2 class="section-title">Lab Screenshots</h2>
+    <p class="section-desc">Real results from a live deployment — not simulated</p>
+  </div>
+
+  <div class="screenshots-grid">
+
+    <div class="screenshot-card">
+      <div class="ss-header">
+        <span class="ss-dot" style="background:#ff5f57"></span>
+        <span class="ss-dot" style="background:#febc2e"></span>
+        <span class="ss-dot" style="background:#28c840"></span>
+        <span class="ss-title">portal.azure.com — huzipc VM</span>
+      </div>
+      <img src="screenshots/azure_vm.png" alt="Azure VM" class="ss-img">
+      <p class="ss-caption">Azure VM huzipc — Ubuntu 24.04, Standard B2ats v2, Public IP 20.235.76.14, Status: Running</p>
+    </div>
+
+    <div class="screenshot-card">
+      <div class="ss-header">
+        <span class="ss-dot" style="background:#ff5f57"></span>
+        <span class="ss-dot" style="background:#febc2e"></span>
+        <span class="ss-dot" style="background:#28c840"></span>
+        <span class="ss-title">huzipc-nsg — Inbound Rules</span>
+      </div>
+      <img src="screenshots/nsg_rules.png" alt="NSG Rules" class="ss-img">
+      <p class="ss-caption">NSG rules — Port 22 (honeypot), Port 23 (telnet trap), Port 4444 (admin secret door)</p>
+    </div>
+
+    <div class="screenshot-card">
+      <div class="ss-header">
+        <span class="ss-dot" style="background:#ff5f57"></span>
+        <span class="ss-dot" style="background:#febc2e"></span>
+        <span class="ss-dot" style="background:#28c840"></span>
+        <span class="ss-title">cowrie@huzipc:~/cowrie — live logs</span>
+      </div>
+      <img src="screenshots/cowrie_logs.png" alt="Cowrie Logs" class="ss-img">
+      <p class="ss-caption">Real attacker from 170.64.234.140 logged in with password '12345' and ran system recon commands</p>
+    </div>
+
+    <div class="screenshot-card">
+      <div class="ss-header">
+        <span class="ss-dot" style="background:#ff5f57"></span>
+        <span class="ss-dot" style="background:#febc2e"></span>
+        <span class="ss-dot" style="background:#28c840"></span>
+        <span class="ss-title">law-honeypot-cd — Log Analytics</span>
+      </div>
+      <img src="screenshots/log_analytics_query.png" alt="Log Analytics" class="ss-img">
+      <p class="ss-caption">CowrieLogs_CL table showing real attack events — login.success, command.input, session.connect</p>
+    </div>
+
+    <div class="screenshot-card">
+      <div class="ss-header">
+        <span class="ss-dot" style="background:#ff5f57"></span>
+        <span class="ss-dot" style="background:#febc2e"></span>
+        <span class="ss-dot" style="background:#28c840"></span>
+        <span class="ss-title">Microsoft Sentinel — Analytics</span>
+      </div>
+      <img src="screenshots/sentinel_analytics_rules.png" alt="Sentinel Rules" class="ss-img">
+      <p class="ss-caption">4 active detection rules — SSH Brute Force, Successful Login, Command Execution, Malware Download</p>
+    </div>
+
+    <div class="screenshot-card">
+      <div class="ss-header">
+        <span class="ss-dot" style="background:#ff5f57"></span>
+        <span class="ss-dot" style="background:#febc2e"></span>
+        <span class="ss-dot" style="background:#28c840"></span>
+        <span class="ss-title">Microsoft Sentinel — Incidents</span>
+      </div>
+      <img src="screenshots/sentinel_incidents_dashboard.png" alt="Incidents" class="ss-img">
+      <p class="ss-caption">597 open incidents — 277 High severity, 320 Medium severity — all auto-detected by Sentinel</p>
+    </div>
+
+    <div class="screenshot-card">
+      <div class="ss-header">
+        <span class="ss-dot" style="background:#ff5f57"></span>
+        <span class="ss-dot" style="background:#febc2e"></span>
+        <span class="ss-dot" style="background:#28c840"></span>
+        <span class="ss-title">Sentinel Workbook — Attack Dashboard</span>
+      </div>
+      <img src="screenshots/workbook_dashboard_1.png" alt="Dashboard" class="ss-img">
+      <p class="ss-caption">Top 10 attacking IPs — 120.48.199.28 made 492 attempts, 146.190.223.166 made 462 attempts</p>
+    </div>
+
+    <div class="screenshot-card">
+      <div class="ss-header">
+        <span class="ss-dot" style="background:#ff5f57"></span>
+        <span class="ss-dot" style="background:#febc2e"></span>
+        <span class="ss-dot" style="background:#28c840"></span>
+        <span class="ss-title">Sentinel Workbook — Passwords</span>
+      </div>
+      <img src="screenshots/workbook_dashboard_2.png" alt="Passwords" class="ss-img">
+      <p class="ss-caption">Most attempted passwords — 123456 tried 195 times. Total: 2,110+ attack attempts logged</p>
+    </div>
+
+    <div class="screenshot-card">
+      <div class="ss-header">
+        <span class="ss-dot" style="background:#ff5f57"></span>
+        <span class="ss-dot" style="background:#febc2e"></span>
+        <span class="ss-dot" style="background:#28c840"></span>
+        <span class="ss-title">Sentinel Workbook — Credentials</span>
+      </div>
+      <img src="screenshots/workbook_dashboard_3.png" alt="Credentials" class="ss-img">
+      <p class="ss-caption">Attacker credentials captured — sophisticated passwords like Welcome@123 from IPs worldwide</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── RESULTS ── -->
+<section id="results" class="results-section">
+  <div class="section-header">
+    <span class="section-tag">// real world results</span>
+    <h2 class="section-title">What We Caught</h2>
+    <p class="section-desc">Within hours of deployment — real attackers from around the world</p>
+  </div>
+
+  <div class="results-grid">
+    <div class="result-card r1">
+      <span class="result-num">597</span>
+      <span class="result-label">Total Incidents</span>
+    </div>
+    <div class="result-card r2">
+      <span class="result-num">277</span>
+      <span class="result-label">High Severity</span>
+    </div>
+    <div class="result-card r3">
+      <span class="result-num">2.1k</span>
+      <span class="result-label">Attack Attempts</span>
+    </div>
+    <div class="result-card r4">
+      <span class="result-num">492</span>
+      <span class="result-label">Max from 1 IP</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── MITRE TABLE ── -->
+<section class="mitre-section">
+  <div class="section-header">
+    <span class="section-tag">// detection coverage</span>
+    <h2 class="section-title">MITRE ATT&amp;CK Coverage</h2>
+    <p class="section-desc">All rules tagged with industry-standard attack technique IDs</p>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Rule Name</th>
+        <th>Severity</th>
+        <th>Tactic</th>
+        <th>Technique</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Honeypot - SSH Brute Force Attack</td>
+        <td><span class="sev-badge sev-medium">Medium</span></td>
+        <td>Credential Access</td>
+        <td>T1110.001</td>
+      </tr>
+      <tr>
+        <td>Honeypot - Successful Login Detected</td>
+        <td><span class="sev-badge sev-high">High</span></td>
+        <td>Initial Access</td>
+        <td>T1078</td>
+      </tr>
+      <tr>
+        <td>Honeypot - Command Execution Detected</td>
+        <td><span class="sev-badge sev-medium">Medium</span></td>
+        <td>Execution</td>
+        <td>T1059</td>
+      </tr>
+      <tr>
+        <td>Honeypot - Malware Download Attempt</td>
+        <td><span class="sev-badge sev-high">High</span></td>
+        <td>Command &amp; Control</td>
+        <td>T1105</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── ABOUT ── -->
+<section id="about" class="about-section">
+  <div class="about-inner">
+    <div class="about-avatar">FK</div>
+    <h2 class="about-name">Feroz Khan</h2>
+    <p class="about-role">// CYBERSECURITY ENGINEER</p>
+    <p class="about-bio">
+      Built this advanced Azure honeypot system as Part 2 of a honeypot series 
+      (following a Windows-based honeypot). Deployed entirely on Azure Free Trial 
+      with $0 cost — from a complete beginner to catching real attackers in one session. 
+      597 incidents detected. 2,110+ attacks logged. All real.
+    </p>
+    <div class="skills-row">
+      <span class="skill-tag">Microsoft Azure</span>
+      <span class="skill-tag">Ubuntu Linux</span>
+      <span class="skill-tag">Cowrie Honeypot</span>
+      <span class="skill-tag">Microsoft Sentinel</span>
+      <span class="skill-tag">KQL</span>
+      <span class="skill-tag">MITRE ATT&CK</span>
+      <span class="skill-tag">iptables</span>
+      <span class="skill-tag">Log Analytics</span>
+      <span class="skill-tag">Threat Detection</span>
+      <span class="skill-tag">SIEM</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <p class="footer-logo">
+    <span>FEROZ KHAN</span> :: Advanced Azure Honeypot &amp; Threat Detection :: March 2026
+  </p>
+  <p style="font-family:var(--mono); font-size:0.65rem; color:var(--muted); margin-top:0.5rem;">
+    Built on Azure Free Trial · $0 cost · 597 real incidents detected
+  </p>
+</footer>
+
+</body>
+</html>
