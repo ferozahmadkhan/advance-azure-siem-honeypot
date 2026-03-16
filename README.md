@@ -20,7 +20,7 @@
 
 ## 🌐 Live Website
 
-Visit the project website: **[ferozkhan.github.io/azure-honeypot](https://ferozkhan.github.io/azure-honeypot)**
+Visit the project website: **[ferozkhan.github.io/azure-honeypot](https://ferozahmadkhan.github.io/advance-azure-siem-honeypot/)**
 
 ---
 
