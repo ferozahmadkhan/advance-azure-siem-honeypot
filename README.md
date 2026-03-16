@@ -149,7 +149,7 @@ CowrieLogs_CL
 
 ## 📝 License
 
-This project is for educational purposes. Use responsibly.
+This project is for educational purposes only. Use responsibly.
 
 ---
 
